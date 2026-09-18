@@ -114,6 +114,21 @@ _model = None
 _client = None
 _collection_cache: Dict[str, Any] = {}
 
+#: 写入代数：每成功写一次（upsert / 重建集合）自增 1。
+#: 用途是给上层做「语料变了吗」的廉价判断——BM25（core/hybrid.py）靠它决定要不要重建索引。
+#: 只看文档条数是不够的：删了旧块又补上新块，条数可能恰好不变，但内容已经换了。
+_revision = 0
+
+
+def revision() -> int:
+    """当前写入代数。每次 ``add_documents()`` / ``reset()`` 都会 +1。"""
+    return _revision
+
+
+def _bump_revision() -> None:
+    global _revision
+    _revision += 1
+
 
 def _import_deps():
     """延迟导入重依赖，缺失时给出可直接复制的安装命令。"""
@@ -131,6 +146,40 @@ def _import_deps():
         ) from e
 
 
+def _resolve_local_model(model_name: str) -> Optional[str]:
+    """模型已经在本机缓存里的话，返回本地目录，**避免联网**。
+
+    为什么必须做这一步（不是优化，是止血）：
+    直接把仓库名交给 ``SentenceTransformer`` 时，它会对 ``config.json`` /
+    ``processor_config.json`` / ``tokenizer.json`` 等一堆文件各发一次 HEAD 请求去
+    校验版本。本机对外网 TLS 不通（证书校验失败），于是每个文件都走
+    「重试 5 次」的退避（1+2+4+8+8 = 23 秒），十几个文件累计 **约 6 分钟**，
+    而权重其实早就在本地。这段时间会砸在应用启动或第一次提问上。
+
+    两种缓存布局都认：
+
+    1. ``data/models/<模型名最后一段>/config.json``
+       —— 从 ModelScope 之类下载的普通目录（``bge-reranker-v2-m3`` 就是这种）
+    2. HuggingFace 的 ``models--<org>--<name>/snapshots/<hash>``
+       —— ``huggingface_hub.snapshot_download(local_files_only=True)`` 直接给出路径，
+       本地没有则抛异常，这里捕获后返回 ``None``，退回原来的联网行为。
+    """
+    local = MODEL_CACHE_DIR / model_name.split("/")[-1]
+    if (local / "config.json").is_file():
+        return str(local)
+
+    try:
+        from huggingface_hub import snapshot_download
+
+        return snapshot_download(
+            model_name,
+            cache_dir=str(MODEL_CACHE_DIR),
+            local_files_only=True,
+        )
+    except Exception:
+        return None
+
+
 def _get_model():
     """加载并缓存 embedding 模型（进程内单例）。"""
     global _model
@@ -142,13 +191,19 @@ def _get_model():
 
     MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     endpoint = os.environ.get("HF_ENDPOINT", "")
-    print(f"[embed_store] 加载模型 {MODEL_NAME}（源: {endpoint or 'huggingface.co 官方'}）")
+
+    resolved = _resolve_local_model(MODEL_NAME)
+    target = resolved or MODEL_NAME
+    if resolved:
+        print(f"[embed_store] 加载模型 {MODEL_NAME}（命中本地缓存，不联网）")
+    else:
+        print(f"[embed_store] 加载模型 {MODEL_NAME}（源: {endpoint or 'huggingface.co 官方'}）")
 
     try:
-        _model = SentenceTransformer(MODEL_NAME, cache_folder=str(MODEL_CACHE_DIR))
+        _model = SentenceTransformer(target, cache_folder=str(MODEL_CACHE_DIR))
     except TypeError:
         # 老版本 sentence-transformers 参数名可能不同
-        _model = SentenceTransformer(MODEL_NAME)
+        _model = SentenceTransformer(target)
 
     dim = _get_embedding_dim(_model)
     if dim != EMBEDDING_DIM:
@@ -293,6 +348,35 @@ def _cosine_to_score(distance: float) -> float:
     return 1.0 - float(distance)
 
 
+#: 文档没有 metadata 时用的占位（见 _chroma_metadatas）
+_PLACEHOLDER_META = {"source": ""}
+
+
+def _chroma_metadatas(metadatas: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    """把 metadata 列表整理成 Chroma 能接受的形式。
+
+    .. warning::
+        **Chroma 1.x 不接受空的 metadata dict**——``{"content": "..."}`` 这种不带
+        metadata 的文档直接 upsert 会抛
+        ``ValueError: Expected metadata to be a non-empty dict, got 0 metadata attributes``。
+        而 ``_clean_metadata()`` 在没有 metadata 时返回的恰好是 ``{}``，
+        所以「文档不带 metadata」这条被文档化支持的用法以前是**直接崩**的。
+
+    处理方式：
+
+    * 整批都没有 metadata → 传 ``None``（Chroma 允许 metadata 整体缺省）
+    * 只有部分没有 → 给缺失的补一个空 ``source`` 占位。
+      ``_to_source()`` 里 ``"". or ...`` 会落到「未知来源」，界面上看不出差别
+
+    混批不能也传 ``None``：那样会把有 metadata 的那部分一起丢掉。
+    """
+    if not metadatas:
+        return None
+    if all(not m for m in metadatas):
+        return None
+    return [m if m else dict(_PLACEHOLDER_META) for m in metadatas]
+
+
 # ---------------------------------------------------------------------------
 # 核心类
 # ---------------------------------------------------------------------------
@@ -368,8 +452,9 @@ class EmbedStore:
             ids=ids,
             documents=contents,
             embeddings=vectors,
-            metadatas=metadatas,
+            metadatas=_chroma_metadatas(metadatas),
         )
+        _bump_revision()
         return len(ids)
 
     # -- 检索 ---------------------------------------------------------------
@@ -428,6 +513,49 @@ class EmbedStore:
         """集合内当前文档条数。"""
         return self.collection.count()
 
+    def all_documents(self, batch_size: int = 1000) -> List[Dict[str, Any]]:
+        """把集合里的**全部**文档取出来，返回 ``[{"id","content","metadata"}, ...]``。
+
+        给 BM25 建倒排索引用的（``core/hybrid.py``）——词面检索需要看到全量语料，
+        这是向量库唯一没法用「相似度查询」代替的操作。
+
+        分页拉取（``limit`` / ``offset``）而不是一次拉完：Chroma 单次返回过大会把内存顶爆，
+        分页对上层透明。
+
+        .. note::
+            返回顺序按 ``id`` 排序，**与写入顺序无关**。之所以要固定，是因为
+            BM25 同分时按文档下标做 tie-break，顺序不稳定会让检索结果不可复现。
+        """
+        total = self.collection.count()
+        if total == 0:
+            return []
+
+        out: List[Dict[str, Any]] = []
+        offset = 0
+        step = max(int(batch_size), 1)
+
+        while offset < total:
+            result = self.collection.get(
+                include=["documents", "metadatas"],
+                limit=step,
+                offset=offset,
+            )
+            ids = result.get("ids") or []
+            if not ids:
+                break
+            documents = result.get("documents") or []
+            metadatas = result.get("metadatas") or []
+            for doc_id, content, metadata in zip(ids, documents, metadatas):
+                out.append({
+                    "id": doc_id,
+                    "content": content or "",
+                    "metadata": metadata or {},
+                })
+            offset += len(ids)
+
+        out.sort(key=lambda d: str(d["id"]))
+        return out
+
     def reset(self) -> None:
         """删除并重建集合（换模型、换切分策略后必须调一次）。"""
         client = get_client()
@@ -437,6 +565,7 @@ class EmbedStore:
             pass
         _collection_cache.pop(self.collection_name, None)
         _get_collection(self.collection_name)
+        _bump_revision()
 
 
 # ---------------------------------------------------------------------------
@@ -466,6 +595,14 @@ def search(query: str, k: int = 3) -> List[Tuple[Dict[str, Any], float]]:
 def count() -> int:
     """默认集合内的文档条数。"""
     return get_store().count()
+
+
+def all_documents(batch_size: int = 1000) -> List[Dict[str, Any]]:
+    """取出默认集合里的全部文档（``[(id, content, metadata), ...]``）。
+
+    主要给 BM25 建索引用，见 :meth:`EmbedStore.all_documents`。
+    """
+    return get_store().all_documents(batch_size=batch_size)
 
 
 def reset_index() -> None:

@@ -10,8 +10,39 @@ chromadb
 # 第四阶段：Web 界面
 streamlit
 
+# 第六阶段：混合检索（BM25 的中文分词）
+# 只用来分词：BM25 本体是自己实现的（core/hybrid.py），没有引 rank_bm25。
+# 缺了它混合检索会自动降级为纯向量检索（config.HYBRID_ENABLED 也可以手动关掉）。
+jieba
+
 # 第四阶段可选：langchain 只用于现成的 RetrievalQA 链。
 # 本项目的 core/rag_chain.py 是自己实现的（system_prompt 要严格可定制），
-# 并不依赖 langchain；装上它会带进 langchain-core / langsmith / pydantic 等一串依赖，
-# 还可能和现有 pin 冲突，所以默认不装。确实要用时取消下面一行的注释：
+# 运行链路并不依赖 langchain。
+#
+# 注意：第七阶段引入 ragas 之后，langchain 全家桶已经**被动装进来了**
+# （ragas 把它列为硬依赖），所以下面这行取消注释与否都不再改变什么。
+# 留着是为了记录「它是可选功能依赖、不是运行链路依赖」这个事实。
 # langchain
+
+# ---------------------------------------------------------------------------
+# 第七阶段：评测闭环（eval/run_eval.py）
+# ---------------------------------------------------------------------------
+# ragas 是指标库，只有跑评测时才用得到；Web 问答链路完全不 import 它。
+#
+# 代价要讲清楚：装它会连带拉进 38 个包，其中 12 个是 langchain 生态
+# （langchain / langchain-core / langchain-classic / langchain-community /
+#  langchain-openai / langchain-protocol / langchain-text-splitters /
+#  langgraph* / langsmith），另有 datasets、instructor、tiktoken、
+#  scikit-network、diskcache 等。这就是「用业界标准口径」的价格。
+ragas==0.4.3
+
+# ⚠ 版本必须锁在 0.4 以下，这不是保守，是**必需的**：
+# ragas 0.4.3 在 ragas/llms/base.py 顶层硬 import 了
+#     from langchain_community.chat_models.vertexai import ChatVertexAI
+# 而 langchain-community 0.4.x（对应 langchain 1.x 的重构）已经删掉了这个模块，
+# 装到 0.4.2 会直接 ModuleNotFoundError。
+# 坑在于：pip 不会报任何冲突（pip check 显示 "No broken requirements found"），
+# 因为 ragas 声明依赖时没写版本上限——要等到 `import ragas` 那一刻才炸。
+# 这里降级 community 到 0.3.x 就够了，不会牵连 langchain-core / langchain-openai。
+langchain-community<0.4
+

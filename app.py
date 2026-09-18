@@ -39,6 +39,41 @@ st.session_state.setdefault("flash", None)   # 重跑后还要显示的提示（
 
 
 # ---------------------------------------------------------------------------
+# 启动预热：把重排模型读进内存
+# ---------------------------------------------------------------------------
+@st.cache_resource(show_spinner=False)
+def warmup_reranker() -> tuple[float, str]:
+    """启动时加载重排模型，返回 ``(加载耗时秒数, 错误信息)``。失败时耗时为 -1，不阻断启动。
+
+    为什么要在启动时做：重排模型是 XLM-R-large（约 2.2GB），光把权重读进来就要二三十秒。
+    不预热的话，这笔开销会砸在用户**第一次提问**上——叠加重排本身的前向耗时，
+    第一问能等到一分钟以上，用户会以为程序卡死。挪到启动阶段只等一次。
+
+    ``st.cache_resource`` 是必须的：Streamlit 每次交互都会从头执行一遍脚本，
+    不加缓存就会反复加载模型。挂在「资源」缓存上，整个进程只执行一次。
+
+    .. note::
+        这里**不能碰 ``st.session_state``**——Streamlit 明令禁止在缓存函数内访问
+        会话状态（缓存命中时函数体压根不执行，写进去的东西也就没了）。
+        所以错误信息是当返回值交给调用方，由界面那边去展示。
+    """
+    if not config.RERANK_ENABLED:
+        return 0.0, ""
+    try:
+        from core.reranker import warmup as _warmup
+
+        return _warmup(), ""
+    except Exception as e:  # noqa: BLE001
+        # 加载失败不该让整个界面打不开：rag_chain.retrieve 里还有一层降级，
+        # 真到检索时重排挂了会自动退回纯向量，问答本身仍然可用。
+        try:
+            log_error("加载重排模型", e)
+        except Exception:  # noqa: BLE001
+            pass
+        return -1.0, f"{type(e).__name__}: {str(e)[:200]}"
+
+
+# ---------------------------------------------------------------------------
 # 增量索引：入库清单（data/index/ingested.json 记录每个文件的 sha1）
 #   sha1 没变      -> 跳过，不重新编码
 #   sha1 变了      -> 先按 metadata.source 删掉旧块，再重新入库
@@ -200,13 +235,49 @@ def store_uploads(uploaded) -> list:
     return saved
 
 
+def _channel(name: str, score, rank) -> str:
+    """把「某一路召回结果」渲染成短标签；没召回到就写明「未召回」。
+
+    注意：``score`` 为 None 才是「没召回」，而不是 ``rank`` 为 None——
+    纯向量路径（关了混合检索）只有分数、没有名次。
+    """
+    if score is None:
+        return f"{name} 未召回"
+    if rank is None:
+        return f"{name} {score:.4f}"
+    return f"{name} #{rank}（{score:.4f}）"
+
+
 def render_sources(sources) -> None:
-    """把来源片段渲染成一排折叠面板。"""
+    """把来源片段渲染成一排折叠面板。
+
+    标题里带上各路名次和分数，用来判断这个块**是哪一路捞上来的**——
+    混合检索到底有没有在起作用，看这一行就够了：
+
+    * ``向量 未召回`` 而 ``BM25 #1`` → 这就是 BM25 补上的盲区（精确字面量）
+    * ``BM25 未召回`` 而 ``向量 #1`` → 语义命中，BM25 帮不上忙（转述 / 同义改写）
+    """
     for src in sources:
-        label = f"来源：{src['source']}　相似度 {src['score']:.4f}"
+        label = f"来源：{src['source']}　最终分 {src['score']:.4f}"
         if src.get("chunk_index") is not None:
             label += f"　第 {src['chunk_index']} 块"
+
+        tags = []
+        if src.get("rerank_score") is not None:
+            tags.append(f"精排 {src['rerank_score']:.4f}")
+        if src.get("rrf_score") is not None:
+            tags.append(f"RRF #{src['rrf_rank']}（{src['rrf_score']:.5f}）")
+        # 走了混合检索才存在「哪一路召回」这回事；
+        # 纯向量路径下不该显示「BM25 未召回」，那会误导成 BM25 试过但没捞到
+        if src.get("rrf_score") is not None:
+            tags.append(_channel("向量", src.get("vector_score"), src.get("vector_rank")))
+            tags.append(_channel("BM25", src.get("bm25_score"), src.get("bm25_rank")))
+        elif src.get("vector_score") is not None:
+            tags.append(f"向量 {src['vector_score']:.4f}")
+
         with st.expander(label):
+            if tags:
+                st.caption("　·　".join(tags))
             st.markdown(src["content"])
 
 
@@ -215,6 +286,17 @@ def render_sources(sources) -> None:
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("知识库")
+
+    if config.RERANK_ENABLED:
+        with st.spinner("正在加载重排模型…"):
+            _rerank_secs, _rerank_err = warmup_reranker()
+        if _rerank_err:
+            st.warning(
+                "重排模型加载失败，本次会话退化为纯向量检索（问答仍然可用）。"
+            )
+            st.caption(_rerank_err)
+        elif _rerank_secs > 0:
+            st.caption(f"重排已就绪　模型加载 {_rerank_secs:.0f}s")
 
     if st.session_state.get("flash"):
         st.success(st.session_state.pop("flash"))
@@ -257,6 +339,11 @@ with st.sidebar:
 
     st.divider()
     st.subheader("当前参数")
+    st.caption(
+        f"v{config.DOCMIND_VERSION}　"
+        f"混合检索 {'开' if config.HYBRID_ENABLED else '关'}　"
+        f"精排 {'开' if config.RERANK_ENABLED else '关'}"
+    )
     st.caption(
         f"切分 {config.CHUNK_SIZE} / 重叠 {config.OVERLAP}　检索 top{config.TOP_K}　"
         f"阈值 {config.THRESHOLD}　模型 {config.MODEL_NAME}"
@@ -302,7 +389,7 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 st.title("DocMind_ 企业知识助手")
 st.caption(
-    f"索引 {embed_store.count()} 个文本块 · 回答只依据你上传的资料 · "
+    f"v{config.DOCMIND_VERSION} · 索引 {embed_store.count()} 个文本块 · 回答只依据你上传的资料 · "
     f"资料里没有的内容会说「{config.REFUSAL_TEXT}」"
 )
 
