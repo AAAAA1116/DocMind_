@@ -2,3 +2,16 @@ openai
 python-dotenv
 pypdf
 python-docx
+
+# 第三阶段：向量化与检索
+sentence-transformers
+chromadb
+
+# 第四阶段：Web 界面
+streamlit
+
+# 第四阶段可选：langchain 只用于现成的 RetrievalQA 链。
+# 本项目的 core/rag_chain.py 是自己实现的（system_prompt 要严格可定制），
+# 并不依赖 langchain；装上它会带进 langchain-core / langsmith / pydantic 等一串依赖，
+# 还可能和现有 pin 冲突，所以默认不装。确实要用时取消下面一行的注释：
+# langchain
