@@ -156,7 +156,11 @@ def ingest_file(path: Path, manifest: dict, force: bool = False) -> dict:
 
     docs = [
         {
-            "content": chunk,
+            # 块内容前带上来源文件名。制度/章程类文档正文一律自称「公司」，
+            # 块内不含公司名，跨文档检索时无法与问题里的公司名对齐——实测
+            # 「北辰实业的董事任期」会命中新宝/龙旗的同构条款（命中 1/6），
+            # 带上来源后同样的查询能正确锚定到北辰（命中 4/6）。
+            "content": f"《{name}》\n{chunk}",
             "metadata": {
                 "source": name,
                 "chunk_index": i,
