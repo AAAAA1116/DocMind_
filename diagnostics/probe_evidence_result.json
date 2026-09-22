@@ -1,0 +1,1059 @@
+{
+  "finished_at": "2026-09-20 21:05:59",
+  "n_chunks": 458,
+  "n_atoms": 67,
+  "levels": {
+    "0": 21,
+    "1": 17,
+    "2": 22,
+    "3": 1,
+    "4": 6
+  },
+  "anchor": {
+    "unique": 48,
+    "multi": 13,
+    "dead": 6
+  },
+  "identity_gap": {
+    "multi": 13,
+    "named": 3,
+    "anon": 10
+  },
+  "literal_vs_semantic": {
+    "uni": 48,
+    "sem_wrong": 24,
+    "sem_wrong_rate": 0.5
+  },
+  "atoms": [
+    {
+      "qid": "q01",
+      "type": "事实",
+      "key": "董事会由9人组成，其中独立董事3人",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q01",
+      "type": "事实",
+      "key": "董事会设董事长1人，可以设副董事长1人，执行董事负责处理董事会授权的事宜",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q02",
+      "type": "事实",
+      "key": "董事由股东会选举产生，任期三年",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": true
+    },
+    {
+      "qid": "q02",
+      "type": "事实",
+      "key": "董事任期届满，可以连选连任",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603341_龙旗科技_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q03",
+      "type": "事实",
+      "key": "公司设立中国共产党北京北辰实业股份有限公司委员会（简称公司党委）和中国共产党北京北辰实业股份有限公司纪律检查委员会（简称公司纪委）",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 3,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": true,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q03",
+      "type": "事实",
+      "key": "董事长和公司党委书记原则上由同一人担任，或同时可根据实际人员情况作适当调整",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q03",
+      "type": "事实",
+      "key": "党员总经理担任副书记，配备一名主抓党建工作的专职副书记",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603341_龙旗科技_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q04",
+      "type": "事实",
+      "key": "公司设董事会，董事会由7名董事组成，其中独立董事3名、职工代表董事1名",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": false
+    },
+    {
+      "qid": "q04",
+      "type": "事实",
+      "key": "董事会设董事长1名，可以设副董事长",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q05",
+      "type": "事实",
+      "key": "董事会由9名董事组成，设董事长1人、副董事长1人",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": false
+    },
+    {
+      "qid": "q05",
+      "type": "事实",
+      "key": "董事会成员中包括3名独立董事（其中至少包括1名会计专业人士）、1名由职工代表担任的董事",
+      "level": 2,
+      "n_docs": 2,
+      "n_chunks": 8,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true
+    },
+    {
+      "qid": "q05",
+      "type": "事实",
+      "key": "审计委员会成员为3名，为不在公司担任高级管理人员的董事，其中独立董事2名，由独立董事中会计专业人士担任召集人",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "002705_新宝股份_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": true
+    },
+    {
+      "qid": "q06",
+      "type": "对比",
+      "key": "北辰实业注册资本为人民币336,702万元",
+      "level": 2,
+      "n_docs": 3,
+      "n_chunks": 4,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "601588_北辰实业_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": true,
+      "has_num": true
+    },
+    {
+      "qid": "q06",
+      "type": "对比",
+      "key": "新宝股份注册资本为人民币81,187.5780万元",
+      "level": 2,
+      "n_docs": 3,
+      "n_chunks": 7,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "601588_北辰实业_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": true,
+      "has_num": true
+    },
+    {
+      "qid": "q06",
+      "type": "对比",
+      "key": "龙旗科技注册资本为人民币52,220.2644万元",
+      "level": 2,
+      "n_docs": 3,
+      "n_chunks": 5,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "601588_北辰实业_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": true,
+      "has_num": true
+    },
+    {
+      "qid": "q07",
+      "type": "转述",
+      "key": "公司将在法定代表人辞任之日起三十日内确定新的法定代表人",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "601588_北辰实业_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": true
+    },
+    {
+      "qid": "q07",
+      "type": "转述",
+      "key": "三家公司章程均有此条（龙旗科技章程写作「30日」，北辰实业与新宝股份写作「三十日」）",
+      "level": 4,
+      "n_docs": 0,
+      "n_chunks": 0,
+      "docs": [],
+      "has_company": true,
+      "has_num": true
+    },
+    {
+      "qid": "q08",
+      "type": "事实",
+      "key": "共五项：",
+      "level": 4,
+      "n_docs": 0,
+      "n_chunks": 0,
+      "docs": [],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q08",
+      "type": "事实",
+      "key": "遵守国家法律、法规、规章及其他相关规定",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q08",
+      "type": "事实",
+      "key": "提高公司经营的效益及效率，提升公司质量，增加对公司股东的回报",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603341_龙旗科技_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q08",
+      "type": "事实",
+      "key": "保障公司资产的安全、完整",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603979_金诚信_内部控制管理制度.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q08",
+      "type": "事实",
+      "key": "确保公司信息披露的真实、准确、完整和公平",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q08",
+      "type": "事实",
+      "key": "促进公司实现发展战略",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q09",
+      "type": "事实",
+      "key": "包括五个基本要素：内部环境、风险评估、控制活动、信息与沟通、内部监督",
+      "level": 3,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300755_华致酒行_内部控制制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q10",
+      "type": "事实",
+      "key": "包括八项基本要素：目标设定、内部环境、风险确认、风险评估、风险管理策略选择、控制活动、信息沟通、检查监督",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "603979_金诚信_内部控制管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603979_金诚信_内部控制管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q11",
+      "type": "对比",
+      "key": "华致酒行的《内部控制制度》规定为五项：内部环境、风险评估、控制活动、信息与沟通、内部监督",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 10,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": true,
+      "has_num": false,
+      "sem_top1": "300755_华致酒行_内部控制制度.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q11",
+      "type": "对比",
+      "key": "金诚信的《内部控制管理制度》规定为八项：目标设定、内部环境、风险确认、风险评估、风险管理策略选择、控制活动、信息沟通、检查监督",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 23,
+      "docs": [
+        "603979_金诚信_内部控制管理制度.pdf"
+      ],
+      "has_company": true,
+      "has_num": false,
+      "sem_top1": "603979_金诚信_内部控制管理制度.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q12",
+      "type": "事实",
+      "key": "内控检查工作资料，包括检查工作报告、工作底稿及相关资料，资料保存时间不少于十年",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "603979_金诚信_内部控制管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603979_金诚信_内部控制管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q13",
+      "type": "多跳",
+      "key": "公司审计监察中心至少应每半年向董事会提交一次检查工作报告",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 3,
+      "docs": [
+        "603979_金诚信_内部控制管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q14",
+      "type": "事实",
+      "key": "内部控制评价报告应当经审计委员会全体成员过半数同意后，方可提交董事会审议",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300755_华致酒行_内部控制制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q15",
+      "type": "事实",
+      "key": "应当建立反舞弊机制，坚持惩防并举、重在预防的原则，明确反舞弊工作的重点领域、关键环节和有关机构的职责权限",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300755_华致酒行_内部控制制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q15",
+      "type": "事实",
+      "key": "应当建立举报投诉制度和举报人保护制度，设置举报专线，明确举报投诉处理程序、办理时限和办结要求，并应当及时传达至全体员工",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "300755_华致酒行_内部控制制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300755_华致酒行_内部控制制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q16",
+      "type": "事实",
+      "key": "公司的委托理财事项要由公司董事会或股东会审议批准，不得将委托理财审批权授予公司董事个人或经营管理层行使",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 3,
+      "docs": [
+        "603979_金诚信_内部控制管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "603341_龙旗科技_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q17",
+      "type": "事实",
+      "key": "A股年度报告应当在每个会计年度结束之日起四个月内",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300604_长川科技_信息披露管理制度.pdf",
+      "sem_docs": 3,
+      "sem_right": true
+    },
+    {
+      "qid": "q17",
+      "type": "事实",
+      "key": "中期报告应当在每个会计年度的上半年结束之日起两个月内",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q17",
+      "type": "事实",
+      "key": "季度报告应当在每个会计年度第三个月、第九个月结束后的一个月内编制完成并披露",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300604_长川科技_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "六种情形：",
+      "level": 4,
+      "n_docs": 0,
+      "n_chunks": 0,
+      "docs": [],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "净利润为负",
+      "level": 0,
+      "n_docs": 2,
+      "n_chunks": 3,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "净利润实现扭亏为盈",
+      "level": 0,
+      "n_docs": 2,
+      "n_chunks": 3,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "实现盈利，且净利润与上年同期相比上升或者下降50%以上",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": false
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "利润总额、净利润或者扣除非经常性损益后的净利润三者孰低为负值，且按照《股票上市规则》相关规定扣除后的营业收入低于1亿元",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 3,
+      "sem_right": false
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "期末净资产为负",
+      "level": 0,
+      "n_docs": 2,
+      "n_chunks": 2,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q18",
+      "type": "事实",
+      "key": "公司股票上市地证券交易所认定的其他情形",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q19",
+      "type": "事实",
+      "key": "公司信息披露文件及公告的保存期限为10年",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q19",
+      "type": "事实",
+      "key": "信息披露文件资料统一由董事会秘书负责保管",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q20",
+      "type": "事实",
+      "key": "首次签订与日常生产经营相关、涉及新业务领域的采购合同，单笔合同金额超过公司最近一期经审计总资产10%且绝对金额超过2亿元的，经董事会审议后公司可以自愿披露",
+      "level": 2,
+      "n_docs": 4,
+      "n_chunks": 28,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf",
+        "601588_北辰实业_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": true
+    },
+    {
+      "qid": "q20",
+      "type": "事实",
+      "key": "签订与日常经营相关的销售合同，单笔合同金额超过公司最近一个会计年度经审计主营业务收入30%且绝对金额超过1亿元的",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": true,
+      "sem_top1": "603341_龙旗科技_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q21",
+      "type": "事实",
+      "key": "三个条件：",
+      "level": 4,
+      "n_docs": 0,
+      "n_chunks": 0,
+      "docs": [],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q21",
+      "type": "事实",
+      "key": "相关信息尚未公开或者泄露",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q21",
+      "type": "事实",
+      "key": "有关内幕信息知情人已书面承诺保密",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 3,
+      "sem_right": true
+    },
+    {
+      "qid": "q21",
+      "type": "事实",
+      "key": "公司股票及其衍生品种的交易未发生异常波动",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300604_长川科技_信息披露管理制度.pdf",
+      "sem_docs": 4,
+      "sem_right": false
+    },
+    {
+      "qid": "q22",
+      "type": "流程",
+      "key": "各业务部门或子公司人员应在第一时间提交暂缓、豁免申请文件并附相关资料，提交公司董事会秘书",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q22",
+      "type": "流程",
+      "key": "董事会秘书审核通过后，报董事长审批",
+      "level": 0,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q22",
+      "type": "流程",
+      "key": "董事长审批决定作暂缓、豁免披露处理的，在申请文件上签字确认后，该信息暂缓、豁免披露",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 2,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 1,
+      "sem_right": true
+    },
+    {
+      "qid": "q22",
+      "type": "流程",
+      "key": "申请未获董事会秘书审核通过或董事长审批通过的，公司应当按照证券监管规定及时对外披露信息",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": true
+    },
+    {
+      "qid": "q23",
+      "type": "事实",
+      "key": "公司董事长为信息披露工作第一责任人，董事会秘书为信息披露工作主要责任人，负责管理信息披露事务",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q24",
+      "type": "事实",
+      "key": "公司董事会秘书领导下的证券部是负责公司信息披露事务的常设机构，即信息披露事务管理部门",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "301172_君逸数码_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q25",
+      "type": "转述",
+      "key": "需要公告",
+      "level": 4,
+      "n_docs": 0,
+      "n_chunks": 0,
+      "docs": [],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q25",
+      "type": "转述",
+      "key": "这属于应当立即披露的重大事件之一：公司主要债务人出现资不抵债或者进入破产程序，公司对相应债权未提取足额坏账准备",
+      "level": 2,
+      "n_docs": 2,
+      "n_chunks": 3,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q25",
+      "type": "转述",
+      "key": "长川科技与君逸数码的信披制度均列明了该情形",
+      "level": 4,
+      "n_docs": 0,
+      "n_chunks": 0,
+      "docs": [],
+      "has_company": true,
+      "has_num": false
+    },
+    {
+      "qid": "q26",
+      "type": "转述",
+      "key": "需要披露",
+      "level": 0,
+      "n_docs": 4,
+      "n_chunks": 5,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q26",
+      "type": "转述",
+      "key": "属于重大事件：「董事或者经理发生变动",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "300604_长川科技_信息披露管理制度.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q26",
+      "type": "转述",
+      "key": "董事长或者经理无法履行职责」",
+      "level": 2,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 1,
+      "sem_right": false
+    },
+    {
+      "qid": "q26",
+      "type": "转述",
+      "key": "注意区分另一条相似条款——「因身体、工作安排等原因无法正常履行职责达到或者预计达到三个月以上」针对的是「除董事长或者经理外的公司其他董事、高级管理人员」，不适用于董事长本人",
+      "level": 2,
+      "n_docs": 6,
+      "n_chunks": 84,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "300604_长川科技_信息披露管理制度.pdf",
+        "300755_华致酒行_内部控制制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf",
+        "601588_北辰实业_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q27",
+      "type": "转述",
+      "key": "有下列情形之一的必须审计：",
+      "level": 2,
+      "n_docs": 5,
+      "n_chunks": 22,
+      "docs": [
+        "002705_新宝股份_公司章程.pdf",
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf",
+        "601588_北辰实业_公司章程.pdf",
+        "603341_龙旗科技_公司章程.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    },
+    {
+      "qid": "q27",
+      "type": "转述",
+      "key": "拟依据半年度报告进行利润分配（仅进行现金分红的除外）、公积金转增股本或者弥补亏损的",
+      "level": 1,
+      "n_docs": 1,
+      "n_chunks": 1,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false,
+      "sem_top1": "601588_北辰实业_公司章程.pdf",
+      "sem_docs": 2,
+      "sem_right": false
+    },
+    {
+      "qid": "q27",
+      "type": "转述",
+      "key": "中国证监会或证券交易所认为应当进行审计的其他情形",
+      "level": 2,
+      "n_docs": 2,
+      "n_chunks": 3,
+      "docs": [
+        "300604_长川科技_信息披露管理制度.pdf",
+        "301172_君逸数码_信息披露管理制度.pdf"
+      ],
+      "has_company": false,
+      "has_num": false
+    }
+  ]
+}
