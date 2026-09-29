@@ -24,6 +24,31 @@
 
 所以标准做法就是「向量召回 N 个 → 交叉编码器精排取 K 个」，本模块负责后半段。
 
+两种后端（``config.RERANK_PROVIDER`` 决定用哪个）
+-------------------------------------------------
+==================  ============================================================
+``"local"``         本地交叉编码器，权重 2.3GB，CPU 前向。慢，但**不依赖任何外部账户**。
+``"siliconflow"``   硅基流动托管 API（``BAAI/bge-reranker-v2-m3``，该平台免费模型）。
+``"dashscope"``     阿里云百炼托管 API（``gte-rerank-v2``）。
+==================  ============================================================
+
+**两者的接口完全一致**（``score`` / ``rerank`` / ``warmup`` / ``is_loaded`` / ``unload``），
+``get_reranker()`` 按配置返回其中一个，调用方（``rag_chain``）不需要知道是哪个。
+
+为什么值得多写一个后端 —— 实测的账（本机 8GB 内存 / 4 核 / 无 CUDA）::
+
+                     耗时        内存占用      18 条 Golden Set
+    本地后端         344 秒/问   会爆（卡死）   不可用
+    托管 API         约 2 秒/问  0             16/18 → 17/18（q06 转通过）
+
+**结论不是「精排没用」，而是「本地精排在这台机器上不可用」** ——
+算法能力和它的工程可行性是两件事，混在一起就会误杀方案。详见 ``config.py`` 的注解。
+
+.. warning::
+    托管服务是**别人的账户**，会因欠费 / 额度耗尽 / 限流整体停摆（实测踩过：
+    阿里云账户欠费时 rerank 返回 ``HTTP 400 Arrearage``，18 条回归全灭）。
+    所以 ``"local"`` 这条退路必须始终能走通 —— 本模块保留完整实现，一行没删。
+
 选型
 ----
 ``BAAI/bge-reranker-v2-m3``：基于 ``bge-m3`` 的多语言重排模型，中英文都强，
@@ -92,8 +117,11 @@ hf-mirror 会把 2.2GB 的 ``model.safetensors`` 重定向到 ``cas-bridge.xethu
 
 from __future__ import annotations
 
+import json
 import os
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -392,23 +420,379 @@ def _release_torch_cache() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 模块级单例：绝大多数场景直接用这三个函数就够了
+# API 后端：把精排交给托管服务（免掉 2.3GB 权重与 CPU 前向）
 # ---------------------------------------------------------------------------
-_default: Optional[Reranker] = None
+#: 各家托管 rerank 服务的元信息。**要新接一家就往这里加一条**，其余代码不用动。
+#:
+#: * ``url``      请求地址
+#: * ``model``    默认模型名（可被 ``config.RERANK_API_MODEL`` 覆盖）
+#: * ``key_env``  从哪个环境变量读 key（写在项目根 ``.env``，已被 .gitignore 忽略）
+#: * ``style``    返回体结构，决定怎么解析：
+#:                ``"jina"`` = 顶层 ``results``；``"dashscope"`` = ``output.results``
+#: * ``name``     中文名，只用于日志和错误提示
+#:
+#: .. warning::
+#:     **``style`` 这一栏不能省，换个平台不是只换个 url。**
+#:     硅基流动返回顶层 ``results``，阿里云百炼返回 ``output.results``——
+#:     套用另一家的解析方式会直接 KeyError。
+API_PROVIDERS: Dict[str, Dict[str, str]] = {
+    "siliconflow": {
+        "url": "https://api.siliconflow.cn/v1/rerank",
+        "model": "BAAI/bge-reranker-v2-m3",
+        "key_env": "SILICONFLOW_API_KEY",
+        "style": "jina",
+        "name": "硅基流动",
+    },
+    "dashscope": {
+        "url": "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank",
+        "model": "gte-rerank-v2",
+        "key_env": "DASHSCOPE_API_KEY",
+        "style": "dashscope",
+        "name": "阿里云百炼",
+    },
+}
+
+#: 单次请求超时（秒）。100 个候选实测 1.1~2.0 秒，这里只是给网络抖动留余量。
+DEFAULT_API_TIMEOUT = 60.0
+
+#: ``429`` / 5xx / 网络错误的额外重试次数。
+#: **鉴权失败、欠费这类 4xx 不重试**——重试解决不了，只会白等（与 llm_client 同一策略）。
+DEFAULT_API_RETRIES = 2
 
 
-def get_reranker() -> Reranker:
-    """取默认单例（首次调用时创建，但此时还不会加载模型）。"""
+class ApiReranker:
+    """托管 rerank API 后端。接口与本地 ``Reranker`` 一致，可直接互换。
+
+    为什么要有它：本地交叉编码器是 XLM-R-large，FP32 权重 2.3GB —— 8GB 内存的机器
+    装不下，跑 100 个候选会爆内存、系统换页、表现成「卡死」（实测卡死 2 小时 19 分）。
+    换托管 API 之后同一套算法约 2 秒/问、零内存占用。
+
+    :param provider: ``API_PROVIDERS`` 里的键（``"siliconflow"`` / ``"dashscope"``）
+    :param model:    覆盖默认模型名；``None`` 表示用表里的默认值
+    :param timeout:  单次请求超时（秒）
+    :param retries:  429 / 5xx / 网络错误的额外重试次数
+
+    .. note::
+        候选 dict 与本地后端一样是**透传**的：``rerank()`` 返回的文档对象就是传进来的
+        那一个，靠 API 返回的 ``index`` 对回原候选列表，不做任何拷贝或改写。
+        这条约定见 ``_normalize_candidates`` 的说明。
+    """
+
+    def __init__(
+        self,
+        provider: str,
+        *,
+        model: Optional[str] = None,
+        timeout: float = DEFAULT_API_TIMEOUT,
+        retries: int = DEFAULT_API_RETRIES,
+    ) -> None:
+        key = str(provider).strip().lower()
+        if key not in API_PROVIDERS:
+            raise RerankerError(
+                f"未知的 RERANK_PROVIDER：{provider!r}。可选："
+                + "、".join(sorted(API_PROVIDERS))
+                + '，或 "local"（走本地模型）。'
+            )
+        self.provider = key
+        self.meta = API_PROVIDERS[key]
+        self.model = (model or self.meta["model"]).strip()
+        self.timeout = float(timeout)
+        self.retries = max(0, int(retries))
+        self._ready = False              # 是否已经成功调通过一次
+        self.last_seconds: Optional[float] = None    # 最近一次请求耗时，排查用
+
+    # -- key -------------------------------------------------------------------
+
+    @property
+    def key_env(self) -> str:
+        """读 key 的环境变量名。"""
+        return self.meta["key_env"]
+
+    def _get_key(self) -> str:
+        key = (os.environ.get(self.key_env) or "").strip()
+        if not key:
+            raise RerankerError(
+                f"未找到 {self.key_env}（{self.meta['name']} 的 rerank key）。\n"
+                f"  在项目根目录的 .env 里加一行：\n"
+                f"      {self.key_env}=sk-你的key\n"
+                f"  （.env 已被 .gitignore 忽略，不会提交）\n"
+                f'  或者把 config.RERANK_PROVIDER 改成 "local" 走本地模型。'
+            )
+        return key
+
+    # -- 请求组装 / 解析 --------------------------------------------------------
+
+    def _build_body(self, query: str, texts: Sequence[str]) -> Dict[str, Any]:
+        """按厂商协议组装请求体。两家的字段名完全不同，不能共用。"""
+        if self.meta["style"] == "jina":
+            # 硅基流动：OpenAI/Jina 风格，documents 直接躺着，top_n 显式给满
+            # （不给的话服务端可能只回一部分，我们就拿不全每个候选的分数）
+            return {
+                "model": self.model,
+                "query": query,
+                "documents": list(texts),
+                "top_n": len(texts),
+                "return_documents": False,
+            }
+        # dashscope：input / parameters 两层包裹
+        return {
+            "model": self.model,
+            "input": {"query": query, "documents": list(texts)},
+            "parameters": {"return_documents": False},
+        }
+
+    def _parse(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """从返回体里取出打分列表。两家路径不同，这里是唯一的分叉点。"""
+        if self.meta["style"] == "jina":
+            return data.get("results") or []
+        return (data.get("output") or {}).get("results") or []
+
+    def _friendly_http_error(self, code: int, detail: str) -> str:
+        where = f"{self.meta['name']} rerank（{self.model}）"
+        low = detail.lower()
+        if code in (401, 403):
+            return f"{where} 鉴权失败（{code}）：{self.key_env} 无效，或该 key 没有这个模型的权限。原始返回：{detail}"
+        if code == 429:
+            return f"{where} 限流（429），已重试 {self.retries} 次仍失败，请稍后再试。原始返回：{detail}"
+        if any(w in low for w in ("arrearage", "insufficient", "overdue", "balance")):
+            return (
+                f"{where} 账户被拒（HTTP {code}）：欠费 / 额度耗尽。\n"
+                f"  **这不是代码问题，也不是 key 格式问题** —— 请求已经到达服务端且鉴权通过，\n"
+                f"  卡在账户状态。去控制台充值，或把 config.RERANK_PROVIDER 换成别家 / \"local\"。\n"
+                f"  原始返回：{detail}"
+            )
+        return f"{where} 返回 HTTP {code}：{detail}"
+
+    def _call(self, query: str, texts: Sequence[str]) -> List[Tuple[int, float]]:
+        """调一次 API，返回 ``[(候选下标, 相关性分), ...]``（顺序照 API 给的，不保证已排序）。"""
+        key = self._get_key()
+        payload = json.dumps(self._build_body(query, texts), ensure_ascii=False).encode("utf-8")
+        last_err = ""
+
+        for attempt in range(self.retries + 1):
+            req = urllib.request.Request(
+                self.meta["url"],
+                data=payload,
+                method="POST",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                },
+            )
+            t0 = time.time()
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                self.last_seconds = time.time() - t0
+                self._ready = True
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:250]
+                msg = self._friendly_http_error(e.code, detail)
+                # 只重试「可能靠重试解决」的：限流和服务端 5xx
+                if (e.code == 429 or e.code >= 500) and attempt < self.retries:
+                    time.sleep(min(3 * (attempt + 1), 10))
+                    last_err = msg
+                    continue
+                raise RerankerError(msg) from e
+            except RerankerError:
+                raise
+            except Exception as e:  # noqa: BLE001 - 超时 / DNS / 连接重置等
+                last_err = f"{type(e).__name__}: {str(e)[:200]}"
+                if attempt < self.retries:
+                    time.sleep(2)
+                    continue
+                raise RerankerError(
+                    f"调用 {self.meta['name']} rerank 失败（已重试 {self.retries} 次）：{last_err}"
+                ) from e
+
+            hits: List[Tuple[int, float]] = []
+            for item in self._parse(data):
+                try:
+                    idx = int(item["index"])
+                    raw_score = item.get("relevance_score")
+                    if raw_score is None:
+                        raw_score = item["score"]
+                    hits.append((idx, float(raw_score)))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            if not hits:
+                raise RerankerError(
+                    f"{self.meta['name']} rerank 返回了空结果或结构不认识"
+                    f"（当前模型 {self.model!r}，style={self.meta['style']!r}）。"
+                    f"模型名写错时常见这个报错。"
+                )
+            return hits
+
+        raise RerankerError(f"调用 {self.meta['name']} rerank 失败：{last_err}")
+
+    # -- 打分 / 重排 ------------------------------------------------------------
+
+    def score(self, query: str, texts: Sequence[str]) -> List[float]:
+        """给一批文本打分，返回与 ``texts`` **等长、下标一一对应**的分数列表。
+
+        .. note::
+            API 返回的是 ``[(下标, 分数)]``，正常每个候选都有分。
+            万一某个下标缺席，那一项按 ``0.0`` 填并打印一行警告 ——
+            **别把它读成「这个块真的不相关」**，它只表示「API 没告诉我们」。
+        """
+        texts = list(texts)
+        if not texts:
+            return []
+
+        hits = self._call(query, texts)
+        out = [0.0] * len(texts)
+        seen = set()
+        for idx, s in hits:
+            if 0 <= idx < len(texts):
+                out[idx] = float(s)
+                seen.add(idx)
+        if len(seen) < len(texts):
+            print(
+                f"[reranker] {self.meta['name']} 只返回了 {len(seen)}/{len(texts)} 个分数，"
+                f"缺失项按 0.0 处理（不代表它们不相关）"
+            )
+        return out
+
+    def rerank(
+        self,
+        query: str,
+        candidates: Sequence[Candidate],
+        top_n: Optional[int] = None,
+    ) -> List[RankedItem]:
+        """对候选块重排，返回 ``[(文档, 重排分数), ...]``，按分数从高到低。
+
+        与本地后端行为一致：文档对象**原样透传**，只调整顺序。
+        """
+        normalized = _normalize_candidates(candidates)
+        if not normalized:
+            return []
+
+        hits = self._call(query, [text for _, text in normalized])
+
+        # 靠 index 对回原候选列表 —— 这样返回的是**同一个 dict 对象**，
+        # 调用方按 doc["id"] 反查各路分数才仍然对得上（见模块内「透传」约定）。
+        ranked: List[RankedItem] = [
+            (normalized[idx][0], float(s))
+            for idx, s in hits
+            if 0 <= idx < len(normalized)
+        ]
+        ranked.sort(key=lambda x: x[1], reverse=True)
+
+        if top_n is not None and top_n >= 0:
+            ranked = ranked[:top_n]
+        return ranked
+
+    # -- 生命周期 ---------------------------------------------------------------
+
+    def warmup(self) -> float:
+        """发一个最小请求探活（1 问 2 文档），返回耗时秒数。
+
+        价值在于**把「key 没配 / 欠费 / 端点变更」在启动时就暴露出来**，
+        而不是等第一个用户提问时才报错。
+        """
+        t0 = time.time()
+        self.score("预热", ["预热文档", "无关内容"])
+        return time.time() - t0
+
+    def is_loaded(self) -> bool:
+        """API 后端没有「加载」这回事；这里表示**是否已经成功调通过一次**。"""
+        return self._ready
+
+    def unload(self) -> None:
+        """API 后端没有本地内存要释放，只把「就绪」标记清掉。"""
+        self._ready = False
+
+
+def provider_info(provider: Optional[str] = None) -> Dict[str, Any]:
+    """当前精排后端的概况，给 ``config.summary()`` 和排查用。
+
+    ``provider`` 传 ``None`` 表示读 ``config.RERANK_PROVIDER``。
+
+    Returns:
+        ``{"provider", "name", "model", "url", "key_env", "key_set", "is_local"}``。
+        本地后端 ``url`` 为空、``key_set`` 恒为 True（它不需要 key）。
+    """
+    import config
+
+    key = str(
+        provider if provider is not None else getattr(config, "RERANK_PROVIDER", "local")
+    ).strip().lower()
+
+    if key in ("", "local"):
+        return {
+            "provider": "local",
+            "name": "本地交叉编码器",
+            "model": getattr(config, "RERANK_MODEL", MODEL_NAME),
+            "url": "",
+            "key_env": "",
+            "key_set": True,          # 本地后端不需要 key
+            "is_local": True,
+        }
+
+    if key not in API_PROVIDERS:
+        raise RerankerError(
+            f"未知的 RERANK_PROVIDER：{key!r}。可选："
+            + "、".join(sorted(API_PROVIDERS))
+            + '，或 "local"。'
+        )
+
+    meta = API_PROVIDERS[key]
+    override = (getattr(config, "RERANK_API_MODEL", "") or "").strip()
+    return {
+        "provider": key,
+        "name": meta["name"],
+        "model": override or meta["model"],
+        "url": meta["url"],
+        "key_env": meta["key_env"],
+        "key_set": bool((os.environ.get(meta["key_env"]) or "").strip()),
+        "is_local": False,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 模块级单例：绝大多数场景直接用这几个函数就够了
+# ---------------------------------------------------------------------------
+_default: Optional[Union[Reranker, ApiReranker]] = None
+
+
+def get_reranker() -> Union[Reranker, ApiReranker]:
+    """取默认精排器（单例），后端由 ``config.RERANK_PROVIDER`` 决定。
+
+    * ``"local"``（或留空）→ ``Reranker``，本地交叉编码器
+    * ``"siliconflow"`` / ``"dashscope"`` → ``ApiReranker``，托管 API
+
+    两者接口一致（``score`` / ``rerank`` / ``warmup``），调用方不需要区分。
+    **创建单例不会加载任何东西**：本地后端是懒加载（第一次调用才读权重），
+    API 后端根本不用加载。
+
+    .. note::
+        单例一旦建好就固定了后端。**运行时改了 ``config.RERANK_PROVIDER``
+        要调 ``reset()``** 才会生效。
+    """
     global _default
     if _default is None:
         import config
 
-        _default = Reranker(
-            model_name=getattr(config, "RERANK_MODEL", MODEL_NAME),
-            max_length=getattr(config, "RERANK_MAX_LENGTH", DEFAULT_MAX_LENGTH),
-            batch_size=getattr(config, "RERANK_BATCH_SIZE", DEFAULT_BATCH_SIZE),
-        )
+        provider = str(getattr(config, "RERANK_PROVIDER", "local") or "local").strip().lower()
+        if provider in ("", "local"):
+            _default = Reranker(
+                model_name=getattr(config, "RERANK_MODEL", MODEL_NAME),
+                max_length=getattr(config, "RERANK_MAX_LENGTH", DEFAULT_MAX_LENGTH),
+                batch_size=getattr(config, "RERANK_BATCH_SIZE", DEFAULT_BATCH_SIZE),
+            )
+        else:
+            _default = ApiReranker(
+                provider,
+                model=(getattr(config, "RERANK_API_MODEL", "") or "").strip() or None,
+                timeout=getattr(config, "RERANK_API_TIMEOUT", DEFAULT_API_TIMEOUT),
+            )
     return _default
+
+
+def reset() -> None:
+    """丢掉默认单例。改了 ``config.RERANK_PROVIDER`` / 换了 key 之后调用，下次重建。"""
+    global _default
+    _default = None
 
 
 def rerank(
@@ -426,19 +810,29 @@ def score(query: str, texts: Sequence[str]) -> List[float]:
 
 
 def warmup() -> float:
-    """提前把模型加载好，返回加载耗时（秒）。
+    """提前把精排准备好，返回耗时（秒）。
 
-    模型加载本身要几十秒（XLM-R-large，CPU 上更慢）。放在第一次提问时做，
-    用户会以为程序卡死；在应用启动时调一次 ``warmup()`` 能把这个等待挪到启动阶段。
+    * **本地后端**：真正把 2.3GB 权重读进来 + 跑一次前向。模型加载本身要几十秒
+      （XLM-R-large，CPU 上更慢），放在第一次提问时做用户会以为程序卡死，
+      所以在应用启动时调一次 ``warmup()``，把这个等待挪到启动阶段。
+    * **API 后端**：发一个最小请求探活（1 问 2 文档，实测不到 1 秒）。
+      顺带把「key 没配 / 账户欠费 / 端点变更」在启动时就暴露出来，
+      而不是等第一个用户提问才报错。
     """
     r = get_reranker()
     t0 = time.time()
-    r.score("预热", ["预热"])          # 真正触发加载 + 一次前向
+    if isinstance(r, ApiReranker):
+        r.warmup()
+    else:
+        r.score("预热", ["预热"])          # 真正触发加载 + 一次前向
     return time.time() - t0
 
 
 def is_loaded() -> bool:
-    """默认单例的模型是否已加载。"""
+    """默认精排器是否已就绪。
+
+    本地后端 = 权重已读进内存；API 后端 = 已经成功调通过一次（它没有「加载」这回事）。
+    """
     return _default is not None and _default.is_loaded()
 
 

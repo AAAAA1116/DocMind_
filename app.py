@@ -6,8 +6,12 @@
     streamlit run app.py
 
 界面分两块：
-    左侧  已入库文件列表 + 多文件上传（上传后自动入库，只处理新文件 / 内容有变化的文件）
+    左侧  上传文档 + 已入库文件清单（上传后自动入库，只处理新文件 / 内容有变化的文件）
     右侧  聊天区，提问后展示回答与来源片段
+
+设计取向：**给不懂技术的人用**。界面上只留「上传」和「提问」两个动作；
+参数、分数、名次、重建索引、日志这些排查用的东西全部收进左侧底部的「高级」折叠面板，
+默认不打扰使用者。
 """
 
 from __future__ import annotations
@@ -43,14 +47,18 @@ st.session_state.setdefault("flash", None)   # 重跑后还要显示的提示（
 # ---------------------------------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def warmup_reranker() -> tuple[float, str]:
-    """启动时加载重排模型，返回 ``(加载耗时秒数, 错误信息)``。失败时耗时为 -1，不阻断启动。
+    """启动时把精排准备好，返回 ``(耗时秒数, 错误信息)``。失败时耗时为 -1，不阻断启动。
 
-    为什么要在启动时做：重排模型是 XLM-R-large（约 2.2GB），光把权重读进来就要二三十秒。
-    不预热的话，这笔开销会砸在用户**第一次提问**上——叠加重排本身的前向耗时，
-    第一问能等到一分钟以上，用户会以为程序卡死。挪到启动阶段只等一次。
+    干什么取决于 ``config.RERANK_PROVIDER``：
+
+    * **本地后端** —— 真正加载权重。重排模型是 XLM-R-large（约 2.2GB），
+      光把权重读进来就要二三十秒；不预热的话这笔开销会砸在用户**第一次提问**上，
+      叠加重排本身的前向耗时，第一问能等到一分钟以上，用户会以为程序卡死。
+    * **API 后端（1.8 起默认）** —— 发一个最小请求探活（1 问 2 文档，不到 1 秒）。
+      启动就能暴露「key 没配 / 账户欠费 / 端点变更」，而不是等第一个用户提问才报错。
 
     ``st.cache_resource`` 是必须的：Streamlit 每次交互都会从头执行一遍脚本，
-    不加缓存就会反复加载模型。挂在「资源」缓存上，整个进程只执行一次。
+    不加缓存就会每次重建后端对象、每次探活。挂在「资源」缓存上，整个进程只执行一次。
 
     .. note::
         这里**不能碰 ``st.session_state``**——Streamlit 明令禁止在缓存函数内访问
@@ -255,33 +263,44 @@ def _channel(name: str, score, rank) -> str:
 def render_sources(sources) -> None:
     """把来源片段渲染成一排折叠面板。
 
-    标题里带上各路名次和分数，用来判断这个块**是哪一路捞上来的**——
-    混合检索到底有没有在起作用，看这一行就够了：
+    默认**只显示来自哪个文件**——提问的人关心的是「依据是什么」，不是分数多少。
+    分数 / 名次 / 块号这些诊断字段，只有勾了「高级」里的开关才显示。
 
-    * ``向量 未召回`` 而 ``BM25 #1`` → 这就是 BM25 补上的盲区（精确字面量）
+    为什么要留那个开关而不是直接删掉：这些字段是判断
+    「某个块是哪一路捞上来的」的唯一入口——
+
+    * ``向量 未召回`` 而 ``BM25 #1`` → BM25 补上的盲区（精确字面量）
     * ``BM25 未召回`` 而 ``向量 #1`` → 语义命中，BM25 帮不上忙（转述 / 同义改写）
-    """
-    for src in sources:
-        label = f"来源：{src['source']}　最终分 {src['score']:.4f}"
-        if src.get("chunk_index") is not None:
-            label += f"　第 {src['chunk_index']} 块"
 
-        tags = []
-        if src.get("rerank_score") is not None:
-            tags.append(f"精排 {src['rerank_score']:.4f}")
-        if src.get("rrf_score") is not None:
-            tags.append(f"RRF #{src['rrf_rank']}（{src['rrf_score']:.5f}）")
-        # 走了混合检索才存在「哪一路召回」这回事；
-        # 纯向量路径下不该显示「BM25 未召回」，那会误导成 BM25 试过但没捞到
-        if src.get("rrf_score") is not None:
-            tags.append(_channel("向量", src.get("vector_score"), src.get("vector_rank")))
-            tags.append(_channel("BM25", src.get("bm25_score"), src.get("bm25_rank")))
-        elif src.get("vector_score") is not None:
-            tags.append(f"向量 {src['vector_score']:.4f}")
+    排查时有用，平时是噪音。所以收进「高级」，默认关。
+    """
+    if not sources:
+        return
+
+    show_diag = bool(st.session_state.get("show_diag", False))
+
+    for i, src in enumerate(sources, 1):
+        label = f"依据 {i}：{src['source']}"
+        if show_diag:
+            label += f"　最终分 {src['score']:.4f}"
+            if src.get("chunk_index") is not None:
+                label += f"　第 {src['chunk_index']} 块"
 
         with st.expander(label):
-            if tags:
-                st.caption("　·　".join(tags))
+            if show_diag:
+                tags = []
+                if src.get("rerank_score") is not None:
+                    tags.append(f"精排 {src['rerank_score']:.4f}")
+                if src.get("rrf_score") is not None:
+                    tags.append(f"RRF #{src['rrf_rank']}（{src['rrf_score']:.5f}）")
+                    # 走了混合检索才存在「哪一路召回」这回事；
+                    # 纯向量路径下不该显示「BM25 未召回」，那会误导成 BM25 试过但没捞到
+                    tags.append(_channel("向量", src.get("vector_score"), src.get("vector_rank")))
+                    tags.append(_channel("BM25", src.get("bm25_score"), src.get("bm25_rank")))
+                elif src.get("vector_score") is not None:
+                    tags.append(f"向量 {src['vector_score']:.4f}")
+                if tags:
+                    st.caption("　·　".join(tags))
             st.markdown(src["content"])
 
 
@@ -290,17 +309,25 @@ def render_sources(sources) -> None:
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("知识库")
+    st.caption(f"DocMind_ v{config.DOCMIND_VERSION}")
 
     if config.RERANK_ENABLED:
-        with st.spinner("正在加载重排模型…"):
+        # v1.8 起精排默认走托管 API，所以这里不再是「加载 2.3GB 权重」，
+        # 而是「发一个最小请求探活」—— 把 key 没配 / 账户欠费这类问题在启动时就暴露。
+        _backend = (
+            "本地模型"
+            if config.RERANK_PROVIDER == "local"
+            else f"{config.RERANK_PROVIDER} API"
+        )
+        with st.spinner(f"正在检查精排后端（{_backend}）…"):
             _rerank_secs, _rerank_err = warmup_reranker()
         if _rerank_err:
             st.warning(
-                "重排模型加载失败，本次会话退化为纯向量检索（问答仍然可用）。"
+                "精排不可用，本次会话改为按 RRF 名次取候选（问答仍然可用）。"
             )
             st.caption(_rerank_err)
         elif _rerank_secs > 0:
-            st.caption(f"重排已就绪　模型加载 {_rerank_secs:.0f}s")
+            st.caption(f"精排已就绪（{_backend}）　{_rerank_secs:.1f}s")
 
     if st.session_state.get("flash"):
         st.success(st.session_state.pop("flash"))
@@ -342,24 +369,32 @@ with st.sidebar:
     st.caption(f"索引内共 {embed_store.count()} 个文本块")
 
     st.divider()
-    st.subheader("当前参数")
-    st.caption(
-        f"v{config.DOCMIND_VERSION}　"
-        f"混合检索 {'开' if config.HYBRID_ENABLED else '关'}　"
-        f"精排 {'开' if config.RERANK_ENABLED else '关'}"
-    )
-    st.caption(
-        f"切分 {config.CHUNK_SIZE} / 重叠 {config.OVERLAP}　检索 top{config.TOP_K}　"
-        f"阈值 {config.THRESHOLD}　模型 {config.MODEL_NAME}"
-    )
-    if config.THRESHOLD > 0:
+
+    # 排查用的东西全部收进这一个折叠面板：默认折叠，不干扰使用者。
+    # 「简易」不等于「删功能」——是把不常用的收起来，需要时还在原位。
+    with st.expander("高级"):
         st.caption(
-            "关于阈值：bge 的相似度绝对值不能当相关性判据，官方原文说「大于 0.5 并不代表两句相似」。"
-            "实测本机样例里正确命中块的分数在 0.51~0.56，所以阈值设 0.6 会把正确结果全过滤掉。"
-            "改 config.THRESHOLD（设 0 即关闭过滤）。"
+            f"v{config.DOCMIND_VERSION}　"
+            f"混合检索 {'开' if config.HYBRID_ENABLED else '关'}　"
+            f"精排 {'开' if config.RERANK_ENABLED else '关'}"
+            + (
+                f"（{config.RERANK_PROVIDER}　池 {config.RERANK_CANDIDATES} → {config.TOP_K}）"
+                if config.RERANK_ENABLED
+                else ""
+            )
+        )
+        st.caption(
+            f"切分 {config.CHUNK_SIZE} / 重叠 {config.OVERLAP}　检索 top{config.TOP_K}　"
+            f"阈值 {config.THRESHOLD}　模型 {config.MODEL_NAME}"
         )
 
-    with st.expander("敏感操作"):
+        st.checkbox(
+            "在「依据」里显示检索诊断",
+            key="show_diag",
+            help="显示每个片段的最终分，以及它是向量还是 BM25 捞上来的。排查检索问题时才需要开。",
+        )
+        st.divider()
+
         if st.button("清空并重建索引", use_container_width=True):
             with st.spinner("重建中…"):
                 results = rebuild(manifest)
@@ -379,8 +414,9 @@ with st.sidebar:
             except LLMError as e:
                 st.error(str(e))
 
-    with st.expander("最近日志"):
-        lines = log_tail(10)
+        st.divider()
+        st.caption("最近日志")
+        lines = log_tail(5)
         if lines:
             for line in lines:
                 st.text(line)
@@ -392,13 +428,52 @@ with st.sidebar:
 # 右侧主区
 # ---------------------------------------------------------------------------
 st.title("DocMind_ 企业知识助手")
-st.caption(
-    f"v{config.DOCMIND_VERSION} · 索引 {embed_store.count()} 个文本块 · 回答只依据你上传的资料 · "
-    f"资料里没有的内容会说「{config.REFUSAL_TEXT}」"
+st.caption("回答只依据你上传的资料；资料里没有的，它会如实告诉你「没找到」。")
+
+# 把底部输入框画成一个「看得见的框」。
+#
+# 为什么必须做这一步：``st.chat_input`` 固定在视口最底部，而主区上半部分是
+# 一大片留白。第一次打开的人扫一眼，视线停在标题上，根本不会注意到最下面
+# 那条几乎无色的灰线是个输入框——实测反馈就是「没看见问答的地方」。
+#
+# 选择器只用 ``data-testid``（Streamlit 为自动化测试保留的稳定钩子），
+# 不去碰 ``st-emotion-cache-*`` 那种每次构建都会变的哈希类名。
+st.markdown(
+    """
+    <style>
+    [data-testid="stChatInput"] {
+        border: 2px solid #4C8BF5 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 2px 16px rgba(76, 139, 245, .20);
+    }
+    [data-testid="stChatInput"] textarea { font-size: 1rem; }
+    [data-testid="stBottom"] { padding-bottom: .9rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 if not manifest:
-    st.info("先在左侧上传文档，然后再提问。")
+    st.info("知识库还是空的。先在左边上传文档，然后就可以提问了。")
+elif not st.session_state["messages"]:
+    # 空状态引导：把「怎么用」直接摆出来，顺手告诉使用者输入框在哪。
+    # 只在还没问过问题时显示——一旦有了问答记录，这块让位给对话本身。
+    with st.container(border=True):
+        st.markdown("#### 怎么用")
+        st.markdown(
+            "1. **传文档** —— 在左侧「知识库」里选择文件，上传后自动入库"
+            f"（当前已入库 **{len(manifest)}** 个文件、{embed_store.count()} 个文本块）。\n"
+            "2. **提问** —— 在**页面最下方**那个蓝色边框的输入框里写下问题，按回车发送。\n"
+            "3. **看依据** —— 回答下方会列出它参考了哪些文件。资料里没有的内容，"
+            f"它会直接说「{config.REFUSAL_TEXT}」，不会编。"
+        )
+        # 这里只教「怎么问」，不举具体问题当例子。
+        # 早先写过「试试问三家公司的注册资本分别是多少」——那正好是评测集里
+        # 答不出的 q06（答案块排名 81，进不了 top-8）。界面亲自推荐一个会失败的
+        # 问题，等于自己拆自己的台。示例改成提问方式，不承诺任何具体答案。
+        st.caption(
+            "小提示：提问时带上文档里出现的原词（公司名、条款里的说法），检索命中率更高。"
+        )
 
 for message in st.session_state["messages"]:
     with st.chat_message(message["role"]):
@@ -407,7 +482,7 @@ for message in st.session_state["messages"]:
         if message.get("refuse_reason"):
             st.caption(f"（{message['refuse_reason']}）")
 
-if prompt := st.chat_input("向知识库提问…"):
+if prompt := st.chat_input("在这里输入你的问题，按回车发送"):
     st.session_state["messages"].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
